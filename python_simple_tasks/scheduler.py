@@ -1,27 +1,22 @@
-import os
 import psycopg2
-from urllib.parse import urlparse
+from python_simple_tasks.utils import load_settings
 import json
 from datetime import datetime, timezone
 
 
-def connect_to_db():
-    """Connect to the database using the DATABASE_URL environment variable or settings.py."""
-    database_url = os.getenv("DATABASE_URL")
-    if database_url:
-        parsed_url = urlparse(database_url)
-        return psycopg2.connect(
-            dbname=parsed_url.path[1:],  # Skip the leading "/"
-            user=parsed_url.username,
-            password=parsed_url.password,
-            host=parsed_url.hostname,
-            port=parsed_url.port,
-        )
 
-    # Fallback to settings.py
-    from python_simple_tasks.utils import load_settings
-    settings = load_settings()
+def connect_to_db():
+    """
+    Connect to the database using the DATABASES configuration from settings.py.
+    Gracefully fail if the configuration is missing or incorrect.
+    """
+    try:
+        settings = load_settings()
+    except (FileNotFoundError, ValueError) as e:
+        raise RuntimeError(f"Failed to load settings.py: {e}")
+
     db = settings.DATABASES["default"]
+
     return psycopg2.connect(
         dbname=db["NAME"],
         user=db["USER"],

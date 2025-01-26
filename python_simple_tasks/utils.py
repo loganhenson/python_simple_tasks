@@ -3,10 +3,46 @@ import importlib.util
 
 
 def load_settings():
-    """Load settings.py."""
-    spec = importlib.util.spec_from_file_location("settings", "./settings.py")
+    """
+    Dynamically load a settings.py file from the current directory or a child directory
+    that matches the name of the current directory. Gracefully fail if the file is not found
+    or if the DATABASES configuration is missing.
+    """
+    # Get the current working directory and its name
+    current_dir = os.getcwd()
+    current_dir_name = os.path.basename(current_dir)
+
+    # Possible locations for settings.py
+    possible_paths = [
+        os.path.join(current_dir, "settings.py"),  # settings.py in the current directory
+        os.path.join(current_dir, current_dir_name, "settings.py"),  # settings.py in a child directory
+    ]
+
+    # Find the first existing settings.py
+    settings_path = next((path for path in possible_paths if os.path.exists(path)), None)
+
+    if not settings_path:
+        raise FileNotFoundError(
+            f"settings.py not found in the current directory ({current_dir}) or in {current_dir_name}/."
+        )
+
+    # Dynamically load settings.py
+    spec = importlib.util.spec_from_file_location("settings", settings_path)
     settings = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(settings)
+
+    # Validate the existence of the DATABASES configuration
+    if not hasattr(settings, "DATABASES"):
+        raise ValueError(
+            "The settings.py file is missing the DATABASES configuration. Please include a DATABASES dictionary."
+        )
+
+    # Validate that the default database is configured
+    if "default" not in settings.DATABASES:
+        raise ValueError(
+            "The DATABASES configuration in settings.py must include a 'default' key with database connection details."
+        )
+
     return settings
 
 
