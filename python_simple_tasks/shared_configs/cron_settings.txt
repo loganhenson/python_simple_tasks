@@ -1,0 +1,11 @@
+files:
+  "/etc/cron.d/task_processor_cron":
+    mode: "000644"
+    owner: root
+    group: root
+    content: |
+      * * * * * /usr/local/bin/pst >> /var/log/pst.log 2>&1
+
+commands:
+  enable_cron:
+    command: "chmod 644 /etc/cron.d/task_processor_cron && crontab /etc/cron.d/task_processor_cron"

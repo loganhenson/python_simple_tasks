@@ -1,111 +1,44 @@
-import os
 import importlib.util
+import os
+import shutil
 
 
 def load_settings():
     """
-    Dynamically load a settings.py file from the current directory or a child directory
-    that matches the name of the current directory. Gracefully fail if the file is not found
-    or if the DATABASES configuration is missing.
+    Load settings.py dynamically from the current working directory.
     """
-    # Get the current working directory and its name
-    current_dir = os.getcwd()
-    current_dir_name = os.path.basename(current_dir)
+    settings_path = os.path.join(os.getcwd(), "settings.py")
+    if not os.path.exists(settings_path):
+        raise FileNotFoundError(f"settings.py not found in {settings_path}")
 
-    # Possible locations for settings.py
-    possible_paths = [
-        os.path.join(current_dir, "settings.py"),  # settings.py in the current directory
-        os.path.join(current_dir, current_dir_name, "settings.py"),  # settings.py in a child directory
-    ]
-
-    # Find the first existing settings.py
-    settings_path = next((path for path in possible_paths if os.path.exists(path)), None)
-
-    if not settings_path:
-        raise FileNotFoundError(
-            f"settings.py not found in the current directory ({current_dir}) or in {current_dir_name}/."
-        )
-
-    # Dynamically load settings.py
     spec = importlib.util.spec_from_file_location("settings", settings_path)
     settings = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(settings)
-
-    # Validate the existence of the DATABASES configuration
-    if not hasattr(settings, "DATABASES"):
-        raise ValueError(
-            "The settings.py file is missing the DATABASES configuration. Please include a DATABASES dictionary."
-        )
-
-    # Validate that the default database is configured
-    if "default" not in settings.DATABASES:
-        raise ValueError(
-            "The DATABASES configuration in settings.py must include a 'default' key with database connection details."
-        )
-
     return settings
 
 
-def setup_eb_settings(overwrite=False):
-    """Generate Elastic Beanstalk (EB) settings for task processing."""
-    eb_dir = ".ebextensions"
-    cron_file = os.path.join(eb_dir, "cron.config")
-
-    if not os.path.exists(eb_dir):
-        os.makedirs(eb_dir)
-        print(f"Created directory: {eb_dir}")
-    elif os.path.exists(cron_file) and not overwrite:
-        print(f"File {cron_file} already exists. Use --overwrite to regenerate.")
-        return
-
-    with open(cron_file, "w") as f:
-        f.write(
-            """files:
-    "/etc/cron.d/python-simple-tasks":
-        mode: "000644"
-        owner: root
-        group: root
-        content: |
-            * * * * * root /usr/bin/python3 /path/to/your/manage.py process_tasks
-commands:
-    remove_old_cron:
-        command: "rm -f /etc/cron.d/python-simple-tasks.bak"
-    restart_cron:
-        command: "service crond restart"
-"""
-        )
-    print(f"EB cron settings generated at: {cron_file}")
-
-
-import inspect
-
-
-def extract_lambda_args(func):
+def setup_eb_settings():
     """
-    Extract arguments captured by a lambda function.
-    Handles both free variables (from closures) and default arguments.
-
-    :param func: The lambda function.
-    :return: A dictionary of argument names and their values.
+    Generate Elastic Beanstalk configuration by copying shared settings into `.ebextensions`.
+    Always overwrites existing files for idempotence.
     """
-    if not callable(func):
-        raise TypeError("Provided function is not callable.")
+    shared_configs_path = os.path.join(os.path.dirname(__file__), "shared_configs")
+    ebextensions_path = ".ebextensions"
 
-    # Extract default arguments
-    signature = inspect.signature(func)
-    default_args = {
-        k: v.default
-        for k, v in signature.parameters.items()
-        if v.default is not inspect.Parameter.empty
-    }
+    # Ensure .ebextensions directory exists
+    os.makedirs(ebextensions_path, exist_ok=True)
 
-    # Extract free variables from the closure
-    free_vars = (
-        {var: cell.cell_contents for var, cell in zip(func.__code__.co_freevars, func.__closure__)}
-        if func.__closure__
-        else {}
-    )
+    # Copy cron settings
+    cron_src = os.path.join(shared_configs_path, "cron_settings.txt")
+    cron_dest = os.path.join(ebextensions_path, "cron.config")
+    shutil.copyfile(cron_src, cron_dest)
+    print(f"Cron configuration copied to {cron_dest}")
 
-    # Merge default arguments and free variables
-    return {**default_args, **free_vars}
+    # Copy prestop hook
+    prestop_src = os.path.join(shared_configs_path, "prestop.sh")
+    prestop_dest = os.path.join(ebextensions_path, "prestop.sh")
+    shutil.copyfile(prestop_src, prestop_dest)
+    os.chmod(prestop_dest, 0o755)
+    print(f"Prestop hook copied to {prestop_dest}")
 
+    print("Elastic Beanstalk configuration successfully generated!")

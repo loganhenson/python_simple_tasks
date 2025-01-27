@@ -36,6 +36,6 @@ def main():
     if args.setup_tables:
         create_tasks_table()
     elif args.setup_eb:
-        setup_eb_settings(overwrite=args.overwrite)
+        setup_eb_settings()
     else:
         process_and_watch_tasks(watch=args.watch, interval=args.interval)
