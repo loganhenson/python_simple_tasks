@@ -1,20 +1,5 @@
-import importlib.util
 import os
 import shutil
-
-
-def load_settings():
-    """
-    Load settings.py dynamically from the current working directory.
-    """
-    settings_path = os.path.join(os.getcwd(), "settings.py")
-    if not os.path.exists(settings_path):
-        raise FileNotFoundError(f"settings.py not found in {settings_path}")
-
-    spec = importlib.util.spec_from_file_location("settings", settings_path)
-    settings = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(settings)
-    return settings
 
 
 def setup_eb_settings():

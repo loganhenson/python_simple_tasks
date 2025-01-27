@@ -4,32 +4,58 @@ import json
 import marshal
 import types
 
-import psycopg2
 from psycopg2 import sql
-
-from python_simple_tasks.utils import load_settings
 from datetime import datetime
+import os
+from urllib.parse import urlparse
+import psycopg2
+from dotenv import load_dotenv
 
 
 def connect_to_db():
     """
-    Connect to the database using the DATABASES configuration from settings.py.
-    Gracefully fail if the configuration is missing or incorrect.
+    Connect to the database using the DATABASE_URL from a .env file.
+    Gives precedence to the .env file in the project using this package.
+
+    Returns:
+        psycopg2.connection: A connection to the PostgreSQL database.
+
+    Raises:
+        RuntimeError: If the DATABASE_URL is missing or invalid, or the connection fails.
     """
     try:
-        settings = load_settings()
-    except (FileNotFoundError, ValueError) as e:
-        raise RuntimeError(f"Failed to load settings.py: {e}")
+        # Load environment variables from the parent project's .env file if present
+        dotenv_path = os.path.join(os.getcwd(), ".env")
+        if os.path.exists(dotenv_path):
+            load_dotenv(dotenv_path)
 
-    db = settings.DATABASES["default"]
+        # Retrieve the DATABASE_URL from the environment
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise RuntimeError("DATABASE_URL is not set in the environment or .env file.")
 
-    return psycopg2.connect(
-        dbname=db["NAME"],
-        user=db["USER"],
-        password=db["PASSWORD"],
-        host=db.get("HOST", "localhost"),
-        port=db.get("PORT", 5432),
-    )
+        # Parse the DATABASE_URL
+        parsed_url = urlparse(database_url)
+        if parsed_url.scheme != "postgres":
+            raise ValueError("Invalid DATABASE_URL: scheme must be 'postgres'.")
+
+        # Extract components from the URL
+        dbname = parsed_url.path.lstrip("/")  # Remove leading slash
+        user = parsed_url.username
+        password = parsed_url.password
+        host = parsed_url.hostname or "localhost"
+        port = parsed_url.port or 5432
+
+        # Connect to the database
+        return psycopg2.connect(
+            dbname=dbname,
+            user=user,
+            password=password,
+            host=host,
+            port=port,
+        )
+    except Exception as e:
+        raise RuntimeError(f"Failed to connect to the database: {e}")
 
 
 def create_tasks_table():

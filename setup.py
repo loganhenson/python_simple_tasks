@@ -8,16 +8,17 @@ setup(
     description="A lightweight Python task scheduler and processor using PostgreSQL.",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/loganhenson/python-simple-tasks",  # GitHub repo URL
-    packages=find_packages(),  # Automatically find all package directories
+    url="https://github.com/loganhenson/python_simple_tasks",
+    packages=find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.7",
+    python_requires=">=3.12",
     install_requires=[
-        "psycopg2-binary",  # PostgreSQL database driver
+        'psycopg2>=2.8',  # PostgreSQL database driver
+        "python-dotenv>=0.21"  # Dependency for loading .env files
     ],
     entry_points={
         "console_scripts": [
